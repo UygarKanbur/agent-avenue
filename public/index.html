@@ -3,15 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agent Avenue - Prototip</title>
+    <title>Agent Avenue - Online Tabletop</title>
     <style>
         :root {
-            --bg-color: #121212;
-            --panel-bg: #1e1e1e;
-            --text-color: #e0e0e0;
+            --bg-color: #0c0e12; /* Daha koyu, sofistike bir siyah */
+            --panel-bg: #16191f;
+            --text-color: #f1f4f8;
             --accent-color: #4CAF50;
             --p1-color: #ff5252;
             --p2-color: #448aff;
+            --path-cell-bg: #e6e0ca; /* Bej path */
+            --tile-shadow: 0 4px 12px rgba(0,0,0,0.6);
         }
 
         body {
@@ -19,121 +21,201 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding: 20px;
+            padding: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             box-sizing: border-box;
+            user-select: none;
         }
 
-        h1, h2, h3 { margin: 10px 0; text-align: center; }
-
-        /* Durum Paneli */
-        #status-panel {
-            width: 100%;
-            max-width: 800px;
-            background: var(--panel-bg);
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            text-align: center;
-            font-weight: bold;
-            font-size: 1.2em;
-            border: 1px solid #333;
-        }
-
-        /* Oyun Tahtası (20 Karelik Döngü) */
-        #board-container {
-            width: 100%;
-            max-width: 800px;
+        /* Full Screen Matchmaking Overlay */
+        #matchmaking-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(12, 14, 18, 0.95);
             display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
+            flex-direction: column;
             justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #matchmaking-status {
+            font-size: 2em;
+            font-weight: bold;
             margin-bottom: 20px;
+            color: #ccc;
+        }
+
+        #join-btn {
+            padding: 15px 30px;
+            font-size: 1.2em;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        #join-btn:hover { background-color: #45a049; }
+        #join-btn:disabled { background-color: #555; cursor: not-allowed; }
+
+        /* Main Game Layout */
+        #game-container {
+            display: none; /* Initially hidden */
+            width: 100%;
+            max-width: 1000px;
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        #status-panel {
             background: var(--panel-bg);
             padding: 15px;
             border-radius: 8px;
+            text-align: center;
+            font-size: 1.3em;
+            font-weight: bold;
+            border: 1px solid #333;
+            border-bottom: 3px solid #333;
         }
 
+        /* Orijinal Tahta Tasarımı ve Döngü */
+        #board-section {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .tile-wrapper {
+            position: relative;
+            width: 250px;
+            height: 350px;
+            border-radius: 12px;
+            box-shadow: var(--tile-shadow);
+            background-size: cover;
+            background-position: center;
+            border: 4px solid transparent;
+            cursor: default;
+        }
+
+        /* İstemci Tarafında Pozisyon Eşleşmesi İçin */
+        #p1-tile { background-image: url('data:image/png;base64,...(original image P1 texture here)...'); }
+        #p2-tile { background-image: url('data:image/png;base64,...(original image P2 texture here)...'); }
+
+        .tile-wrapper.active-turn { border-color: var(--accent-color); }
+
+        /* Tahta Hücreleri (Path Cells) - Interaktif Olmayan Görünür Alan */
         .board-cell {
-            width: 40px;
-            height: 40px;
-            background-color: #2a2a2a;
-            border: 1px solid #444;
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            background-color: var(--path-cell-bg);
             border-radius: 4px;
+            border: 1px solid #999;
+            box-sizing: border-box;
+            font-size: 0.7em;
+            color: #333;
             display: flex;
             justify-content: center;
             align-items: center;
-            position: relative;
-            font-size: 0.8em;
-            color: #666;
         }
+        
+        /* Örnek hücre yerleşimi (Orijinal Tasarıma Göre) */
+        /* Bu yerleşim P1 ve P2 tile'larının path'ini tam olarak 20 karelik bir loop yapacak şekilde simüle eder. */
+        /* P1 tile cells (0-9) */
+        #cell-0 { top: 10px; left: 10px; } /* Start/Hat */
+        #cell-1 { top: 10px; left: 52px; }
+        #cell-2 { top: 10px; left: 94px; }
+        #cell-3 { top: 10px; left: 136px; }
+        #cell-4 { top: 10px; right: 10px; }
+        #cell-5 { top: 52px; right: 10px; }
+        #cell-6 { top: 94px; right: 10px; }
+        #cell-7 { top: 136px; right: 10px; }
+        #cell-8 { bottom: 10px; right: 10px; }
+        #cell-9 { bottom: 10px; right: 52px; }
+        /* P2 tile cells (10-19) */
+        #cell-10 { bottom: 10px; right: 94px; } /* Start P2 */
+        #cell-11 { bottom: 10px; right: 136px; }
+        #cell-12 { bottom: 10px; left: 10px; }
+        #cell-13 { bottom: 52px; left: 10px; }
+        #cell-14 { bottom: 94px; left: 10px; }
+        #cell-15 { bottom: 136px; left: 10px; }
+        #cell-16 { top: 136px; left: 10px; }
+        #cell-17 { top: 94px; left: 10px; }
+        #cell-18 { top: 52px; left: 10px; }
+        #cell-19 { top: 10px; left: 10px; } /* Loop'un son hücresi, P1 hücresine bitişik */
 
+        /* Meeples */
         .meeple {
             width: 15px;
             height: 15px;
             border-radius: 50%;
             position: absolute;
+            transition: transform 0.3s ease-out;
+            border: 2px solid #fff;
         }
-        .meeple.p1 { background-color: var(--p1-color); top: 5px; left: 5px; }
-        .meeple.p2 { background-color: var(--p2-color); bottom: 5px; right: 5px; }
+        .meeple.p1 { background-color: var(--p1-color); top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .meeple.p2 { background-color: var(--p2-color); top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
-        /* Merkez: Ortaya Sürülen Kartlar */
-        #offer-area {
+        /* Merkez Tablo Alanı: Teklif ve Deste */
+        #central-table {
             display: flex;
             gap: 20px;
-            min-height: 120px;
-            margin-bottom: 20px;
-            align-items: center;
             justify-content: center;
-            width: 100%;
+            align-items: center;
+            padding: 10px;
+        }
+
+        #deck-visual {
+            width: 90px; height: 130px;
+            background: #2a3a50; border: 2px solid #555;
+            border-radius: 8px; display: flex; align-items: center; justify-content: center;
+            color: #777; font-size: 0.9em;
         }
 
         .offer-slot {
-            width: 100px;
-            height: 140px;
-            border: 2px dashed #555;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: 0.3s;
+            width: 100px; height: 140px;
+            border: 3px dashed #555; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: default; transition: 0.2s;
         }
 
-        .offer-slot:hover { border-color: var(--accent-color); }
+        .offer-slot.selectable:hover { border-color: var(--accent-color); cursor: pointer; }
 
-        /* Kart Stili */
+        /* Kart Stili (Modern Spy Theme) */
         .card {
-            width: 90px;
-            height: 130px;
-            background: #2c3e50;
-            border: 2px solid #34495e;
-            border-radius: 6px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            user-select: none;
-            transition: transform 0.2s, border-color 0.2s;
+            width: 90px; height: 130px;
+            background: #1e1e1e; border: 2px solid #444; border-radius: 6px;
+            display: flex; flex-direction: column; align-items: center; justify-content: space-around;
+            cursor: default; transition: transform 0.2s, border-color 0.2s;
+            overflow: hidden;
         }
         
-        .card.hidden { background: #555; border-color: #777; color: transparent; }
-        .card:hover { transform: translateY(-5px); border-color: var(--accent-color); }
+        .card.hidden { background: #333; border-color: #555; color: transparent; }
+        .card:not(.hidden).playable:hover { transform: translateY(-5px); border-color: var(--accent-color); cursor: pointer; }
         .card.selected { border-color: var(--accent-color); transform: translateY(-10px); }
 
-        /* Oyuncu Alanları (El ve Toplananlar) */
+        .card-icon { font-size: 1.5em; margin-bottom: 5px; }
+        .card-label { font-size: 0.8em; text-transform: uppercase; font-weight: bold; }
+        .card-props { font-size: 0.7em; color: #888; text-align: center; }
+
+        /* Oyuncu Alanları */
         .player-area {
             display: flex;
             width: 100%;
-            max-width: 800px;
             justify-content: space-between;
             background: var(--panel-bg);
             padding: 15px;
             border-radius: 8px;
+            border-top: 2px solid #333;
         }
 
         .hand-container, .tableau-container {
@@ -142,37 +224,59 @@
             gap: 10px;
         }
 
-        .cards-row {
-            display: flex;
-            gap: 10px;
-        }
-
         .tableau-container h3 { font-size: 1em; margin-bottom: 5px; color: #aaa; }
+        .cards-row { display: flex; gap: 10px; min-height: 130px; }
+
+        /* Avatarlar */
+        .player-avatar { width: 50px; height: 50px; border-radius: 50%; background-size: cover; border: 3px solid transparent; }
+        .p1-avatar { background-image: url('data:image/png;base64,...(original image P1 avatar here)...'); }
+        .p2-avatar { background-image: url('data:image/png;base64,...(original image P2 avatar here)...'); }
+        .active-player { border-color: var(--accent-color); }
+
+        #submit-offer {
+            padding: 10px 20px; font-size: 1em; background-color: #555; color: white;
+            border: none; border-radius: 6px; cursor: not-allowed; transition: 0.3s;
+            margin-top: 10px; display: none;
+        }
+        #submit-offer.ready { background-color: var(--accent-color); cursor: pointer; display: block; }
     </style>
 </head>
 <body>
 
-    <div id="status-panel">Sunucuya bağlanılıyor...</div>
-
-    <div id="board-container"></div>
-
-    <div id="offer-area">
-        <div id="open-offer" class="offer-slot">Açık Kart Bekleniyor</div>
-        <div id="hidden-offer" class="offer-slot">Kapalı Kart Bekleniyor</div>
+    <div id="matchmaking-screen">
+        <div id="matchmaking-status">AGENT AVENUE: ÇEVRİMİÇİ PROTOTİP</div>
+        <button id="join-btn" onclick="joinQueue()">Eşleşme Ara</button>
     </div>
 
-    <div class="player-area">
-        <div class="tableau-container">
-            <h3>Setlerim (Toplanan)</h3>
-            <div id="my-tableau" class="cards-row"></div>
-            <h3 style="margin-top: 15px;">Rakibin Setleri</h3>
-            <div id="opp-tableau" class="cards-row"></div>
+    <div id="game-container">
+        <div id="status-panel">Sistem yükleniyor...</div>
+
+        <div id="board-section">
+            <div id="p1-tile" class="tile-wrapper"></div>
+            <div id="central-table">
+                <div id="deck-visual">Deste<br><small>(38 Kart)</small></div>
+                <div id="open-offer" class="offer-slot">Teklif 1<br>(Açık)</div>
+                <div id="hidden-offer" class="offer-slot">Teklif 2<br>(Kapalı)</div>
+            </div>
+            <div id="p2-tile" class="tile-wrapper"></div>
         </div>
 
-        <div class="hand-container">
-            <h3>Elimdeki Kartlar</h3>
-            <div id="my-hand" class="cards-row"></div>
-            <button id="submit-offer" style="padding:10px; margin-top:10px; cursor:pointer; display:none;">Seçili 2 Kartı Sür</button>
+        <div class="player-area">
+            <div class="tableau-container">
+                <div class="player-info" style="display: flex; align-items: center; gap: 10px;">
+                    <div id="my-avatar" class="player-avatar"></div>
+                    <div style="display:flex; flex-direction:column;">
+                        <h3>Siz (Kırmızı) - Setlerim</h3>
+                    </div>
+                </div>
+                <div id="my-tableau" class="cards-row"></div>
+            </div>
+
+            <div class="hand-container" style="align-items: flex-end;">
+                <h3>Elimdeki Kartlar</h3>
+                <div id="my-hand" class="cards-row"></div>
+                <button id="submit-offer">2 Seçili Kartı Sür</button>
+            </div>
         </div>
     </div>
 
@@ -181,113 +285,134 @@
         const socket = io();
         let myId = null;
         let roomId = null;
-        let gameState = null;
         let selectedHandCards = []; // Sürülecek 2 kartı tutar
 
         // DOM Elementleri
+        const matchmakingScreen = document.getElementById('matchmaking-screen');
+        const matchmakingStatus = document.getElementById('matchmaking-status');
+        const joinBtn = document.getElementById('join-btn');
+        const gameContainer = document.getElementById('game-container');
         const statusPanel = document.getElementById('status-panel');
-        const boardContainer = document.getElementById('board-container');
         const myHandEl = document.getElementById('my-hand');
         const myTableauEl = document.getElementById('my-tableau');
-        const oppTableauEl = document.getElementById('opp-tableau');
         const openOfferEl = document.getElementById('open-offer');
         const hiddenOfferEl = document.getElementById('hidden-offer');
         const submitOfferBtn = document.getElementById('submit-offer');
+        const myAvatar = document.getElementById('my-avatar');
+        const p1Tile = document.getElementById('p1-tile');
+        const p2Tile = document.getElementById('p2-tile');
 
-        // Tahtayı Çiz (20 hücre)
+        // Tahtayı Çiz (20 hücre) - Orijinal Tasarım Yerleşimiyle
         function initBoard() {
-            boardContainer.innerHTML = '';
             for (let i = 0; i < 20; i++) {
                 const cell = document.createElement('div');
                 cell.className = 'board-cell';
                 cell.id = `cell-${i}`;
                 cell.innerText = i;
-                boardContainer.appendChild(cell);
+                if (i < 10) p1Tile.appendChild(cell);
+                else p2Tile.appendChild(cell);
             }
         }
         initBoard();
 
-        socket.on('connect', () => {
-            myId = socket.id;
+        function joinQueue() {
+            joinBtn.disabled = true;
+            joinBtn.innerText = "Kuyruğa giriliyor...";
+            matchmakingStatus.innerText = "Eşleştirme aranıyor...";
             socket.emit('joinMatchmaking');
-            statusPanel.innerText = "Eşleştirme kuyruğuna girildi...";
-        });
+        }
+
+        socket.on('connect', () => { myId = socket.id; });
 
         socket.on('waitingForOpponent', (data) => {
-            statusPanel.innerText = data.message;
+            matchmakingStatus.innerText = "Eşleştirme aranıyor... (Kuyrukta bekliniyor)";
         });
 
         socket.on('gameStart', (state) => {
+            console.log("Game started:", state);
             roomId = state.id;
+            matchmakingScreen.style.display = 'none'; // Eşleşme ekranını gizle
+            gameContainer.style.display = 'flex'; // Oyun ekranını göster
             updateUI(state);
         });
 
-        socket.on('updateState', (state) => {
-            updateUI(state);
-        });
+        socket.on('updateState', (state) => { updateUI(state); });
 
         socket.on('offerReceived', (offer) => {
-            statusPanel.innerText = "Rakip kart sürdü. Lütfen birini seçiniz.";
+            statusPanel.innerText = "Sıra Sizde: Rakip kart sürdü. Birini SEÇİN.";
+            statusPanel.style.color = "var(--accent-color)";
             renderOfferPhase(offer.openCard, offer.hiddenCard, true);
         });
 
         socket.on('gameOver', (data) => {
-            const result = data.winnerId === myId ? "KAZANDINIZ!" : "KAYBETTİNİZ.";
+            const result = data.winnerId === myId ? "KAZANDINIZ!" : "RAKİBİNİZ KAZANDI.";
             statusPanel.innerText = `OYUN BİTTİ - ${result}`;
             statusPanel.style.color = data.winnerId === myId ? "var(--accent-color)" : "var(--p1-color)";
+            updateUI(data.finalState); // Son durumu göster
         });
 
         socket.on('opponentDisconnected', (data) => {
             statusPanel.innerText = data.message;
+            statusPanel.style.color = "var(--p1-color)";
         });
 
         function updateUI(state) {
-            gameState = state;
             selectedHandCards = [];
-            submitOfferBtn.style.display = 'none';
-
-            const isMyTurn = state.turn === myId;
-            statusPanel.innerText = isMyTurn ? "Sıra Sizde: Sürmek için elinizden 2 kart seçin." : "Rakibin Hamlesi Bekleniyor...";
-
-            const myData = state.players[myId];
-            const oppId = Object.keys(state.players).find(id => id !== myId);
-            const oppData = state.players[oppId];
-
-            // Piyonları Yerleştir
-            document.querySelectorAll('.meeple').forEach(m => m.remove());
-            const myPos = myData.position % 20;
-            const oppPos = oppData.position % 20;
-            
-            const myMeeple = document.createElement('div');
-            myMeeple.className = `meeple ${myData.number === 1 ? 'p1' : 'p2'}`;
-            document.getElementById(`cell-${myPos}`).appendChild(myMeeple);
-
-            const oppMeeple = document.createElement('div');
-            oppMeeple.className = `meeple ${oppData.number === 1 ? 'p1' : 'p2'}`;
-            document.getElementById(`cell-${oppPos}`).appendChild(oppMeeple);
-
-            // Eli Çiz
-            myHandEl.innerHTML = '';
-            myData.hand.forEach(card => {
-                const cardEl = createCardElement(card);
-                if (isMyTurn) {
-                    cardEl.onclick = () => toggleHandSelection(card, cardEl);
-                }
-                myHandEl.appendChild(cardEl);
-            });
-
-            // Setleri (Tableau) Çiz
-            myTableauEl.innerHTML = '';
-            myData.tableau.forEach(card => myTableauEl.appendChild(createCardElement(card)));
-            
-            oppTableauEl.innerHTML = '';
-            oppData.tableau.forEach(card => oppTableauEl.appendChild(createCardElement(card)));
-
-            // Teklif Alanını Temizle
-            openOfferEl.innerHTML = 'Açık Kart';
-            hiddenOfferEl.innerHTML = 'Kapalı Kart';
+            submitOfferBtn.classList.remove('ready');
+            submitOfferBtn.onclick = null;
             openOfferEl.onclick = null;
             hiddenOfferEl.onclick = null;
+
+            const isMyTurn = state.turn === myId;
+            const myData = state.players[myId];
+            const p1Id = Object.keys(state.players).find(id => state.players[id].number === 1);
+            const p2Id = Object.keys(state.players).find(id => state.players[id].number === 2);
+            const p1Data = state.players[p1Id];
+            const p2Data = state.players[p2Id];
+
+            statusPanel.innerText = isMyTurn ? "Sıra Sizde: Sürmek için elinizden 2 kart seçin." : "Rakibin Hamlesi Bekleniyor...";
+            statusPanel.style.color = isMyTurn ? "var(--accent-color)" : "var(--text-color)";
+
+            // Meeples ve Tile Vurgulama
+            document.querySelectorAll('.meeple').forEach(m => m.remove());
+            document.querySelectorAll('.tile-wrapper').forEach(t => t.classList.remove('active-turn'));
+            
+            const p1Pos = p1Data.position % 20;
+            const p2Pos = p2Data.position % 20;
+            
+            const p1Meeple = document.createElement('div'); p1Meeple.className = 'meeple p1';
+            document.getElementById(`cell-${p1Pos}`).appendChild(p1Meeple);
+
+            const p2Meeple = document.createElement('div'); p2Meeple.className = 'meeple p2';
+            document.getElementById(`cell-${p2Pos}`).appendChild(p2Meeple);
+
+            if (p1Data.id === state.turn) p1Tile.classList.add('active-turn');
+            if (p2Data.id === state.turn) p2Tile.classList.add('active-turn');
+
+            // Avatar ve Oyuncu Bilgisi
+            myAvatar.className = `player-avatar ${myData.number === 1 ? 'p1-avatar' : 'p2-avatar'} ${isMyTurn ? 'active-player' : ''}`;
+
+            // Eli ve Tableau'yu Çiz
+            renderCards(myHandEl, myData.hand, isMyTurn && !state.currentOffer, toggleHandSelection);
+            renderCards(myTableauEl, myData.tableau, false);
+            
+            // Teklif Alanını Güncelle
+            if (state.currentOffer) {
+                renderOfferPhase(state.currentOffer.openCard, {id: 'hidden'}, false);
+            } else {
+                openOfferEl.innerText = "Teklif 1";
+                hiddenOfferEl.innerText = "Teklif 2";
+            }
+        }
+
+        function renderCards(container, cards, isPlayable, onClick = null) {
+            container.innerHTML = '';
+            cards.forEach(card => {
+                const cardEl = createCardElement(card);
+                if (isPlayable) cardEl.classList.add('playable');
+                if (onClick) cardEl.onclick = () => onClick(card, cardEl);
+                container.appendChild(cardEl);
+            });
         }
 
         function createCardElement(card) {
@@ -297,13 +422,28 @@
                 el.classList.add('hidden');
                 el.innerText = "?";
             } else {
-                el.innerHTML = `<strong>${card.type}</strong><br><small>#${card.id}</small>`;
+                // Tematik kart içeriği (Basit bir spy teması)
+                let icon = '🕵️', props = '';
+                switch(card.type) {
+                    case 'Agent': icon = '🕵️'; props = '+2 Intel'; break;
+                    case 'Gadget': icon = '🦾'; props = '+2 Tech'; break;
+                    case 'Intel': icon = '📜'; props = '+2 Set'; break;
+                    case 'Vehicle': icon = '🚗'; props = '+2 Set'; break;
+                    case 'Wildcard': icon = '🎲'; props = 'Special'; break;
+                }
+                el.innerHTML = `
+                    <div class="card-icon">${icon}</div>
+                    <div class="card-label">${card.type}</div>
+                    <div class="card-props">${props}</div>
+                    <small>#${card.id}</small>
+                `;
             }
             return el;
         }
 
         function toggleHandSelection(card, element) {
-            if (selectedHandCards.find(c => c.id === card.id)) {
+            const isSelected = selectedHandCards.find(c => c.id === card.id);
+            if (isSelected) {
                 selectedHandCards = selectedHandCards.filter(c => c.id !== card.id);
                 element.classList.remove('selected');
             } else if (selectedHandCards.length < 2) {
@@ -312,13 +452,15 @@
             }
 
             if (selectedHandCards.length === 2) {
-                submitOfferBtn.style.display = 'block';
+                submitOfferBtn.classList.add('ready');
+                submitOfferBtn.onclick = submitOffer;
             } else {
-                submitOfferBtn.style.display = 'none';
+                submitOfferBtn.classList.remove('ready');
+                submitOfferBtn.onclick = null;
             }
         }
 
-        submitOfferBtn.onclick = () => {
+        function submitOffer() {
             if (selectedHandCards.length === 2) {
                 // İlk seçilen açık, ikinci seçilen kapalı olsun
                 socket.emit('playOffer', {
@@ -327,15 +469,13 @@
                     hiddenCardId: selectedHandCards[1].id
                 });
                 
-                openOfferEl.innerHTML = '';
-                openOfferEl.appendChild(createCardElement(selectedHandCards[0]));
-                hiddenOfferEl.innerHTML = '';
-                hiddenOfferEl.appendChild(createCardElement({id: 'hidden'}));
-                
-                statusPanel.innerText = "Kartlar sürüldü. Rakibin seçimi bekleniyor...";
-                submitOfferBtn.style.display = 'none';
+                statusPanel.innerText = "Teklif sürüldü. Rakibin seçimi bekleniyor...";
+                statusPanel.style.color = "var(--text-color)";
+                selectedHandCards = [];
+                submitOfferBtn.classList.remove('ready');
+                submitOfferBtn.onclick = null;
             }
-        };
+        }
 
         function renderOfferPhase(openCard, hiddenCard, canSelect) {
             openOfferEl.innerHTML = '';
@@ -348,6 +488,8 @@
             hiddenOfferEl.appendChild(hiddenCardEl);
 
             if (canSelect) {
+                openOfferEl.classList.add('selectable');
+                hiddenOfferEl.classList.add('selectable');
                 openOfferEl.onclick = () => selectOffer(false);
                 hiddenOfferEl.onclick = () => selectOffer(true);
             }
@@ -358,8 +500,6 @@
                 roomId: roomId,
                 selectedIsHidden: isHidden
             });
-            openOfferEl.onclick = null;
-            hiddenOfferEl.onclick = null;
         }
     </script>
 </body>
